@@ -1173,6 +1173,7 @@ function safeParse(raw, fallback){
 let db = safeParse(localStorage.getItem(DB_KEY), null);
 let favorites = safeParse(localStorage.getItem(FAV_KEY), []);
 let reports = safeParse(localStorage.getItem(REPORT_KEY), []);
+let reportsLoaded = false; // reports cloud kaytjibo ghir l Admin (auth)
 let storedVersion = Number(localStorage.getItem(VERSION_KEY) || 0);
 
 /*
@@ -1347,12 +1348,8 @@ async function cloudLoadAll(){
     .map(d => d.data())
     .filter(s => s && s.id);
 
-  const reportsSnap = await cloud.collection(REPORTS_COLLECTION).get();
-  reports = reportsSnap.docs.map(d => d.data()).filter(r => r && r.id);
-
   sortSites();
   saveDB();
-  saveReports();
 
   if(needsCloudDefaultsSync){
     try{
@@ -1383,12 +1380,20 @@ async function cloudSeedCurrentData(){
     batch.set(cloud.collection(SITES_COLLECTION).doc(String(site.id)), docData);
   });
 
-  reports.forEach(report => {
-    batch.set(cloud.collection(REPORTS_COLLECTION).doc(String(report.id)), report);
-  });
-
   await batch.commit();
   console.log("Seeded cloud with", db.length, "sites.");
+
+  if(reports.length){
+    try{
+      const reportsBatch = cloud.batch();
+      reports.forEach(report => {
+        reportsBatch.set(cloud.collection(REPORTS_COLLECTION).doc(String(report.id)), report);
+      });
+      await reportsBatch.commit();
+    }catch(e){
+      console.warn("Reports seed skipped (permission):", e);
+    }
+  }
 }
 
 /* Sites dyal defaults: katzid l'jdad w kat-updati l'9dam
@@ -1888,6 +1893,24 @@ async function deleteReport(reportId){
   updateStats();
 }
 
+/* Reports mn cloud kaytjibo ghir mn ki ydkhel Admin
+   (rules: read khasso auth) */
+async function ensureReportsLoaded(){
+  if(!cloudReady || reportsLoaded) return;
+  reportsLoaded = true;
+
+  try{
+    const snap = await cloud.collection(REPORTS_COLLECTION).get();
+    reports = snap.docs.map(d => d.data()).filter(r => r && r.id);
+    saveReports();
+  }catch(e){
+    console.warn("Reports cloud load failed:", e);
+  }
+
+  renderReports();
+  updateStats();
+}
+
 function renderReports(){
   const box = document.getElementById("reportsList");
 
@@ -1983,6 +2006,7 @@ function showPage(page){
     renderSitesTable();
     renderReports();
     updateStats();
+    ensureReportsLoaded();
   }
 
   window.scrollTo({ top:0, behavior:"smooth" });
