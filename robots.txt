@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://alyoussfiamine-pixel.github.io/MarocHubOnline/sitemap.xml
