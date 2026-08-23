@@ -631,10 +631,10 @@ nav{
       </div>
 
       <div class="form-group">
-        <label id="labelImage">رابط صورة الأيقونة (اختيوري)</label>
+        <label id="labelImage">رابط صورة الأيقونة (اختياري)</label>
         <input
           id="siteImage"
-          type="url"
+          type="text"
           placeholder="https://cdn.simpleicons.org/spotify"
         >
       </div>
@@ -656,7 +656,59 @@ nav{
   </div>
 
   <div class="panel">
+    <h3 id="manageCatsTitle">🏷️ إدارة التصنيفات</h3>
+    <br>
+
+    <form id="catForm" onsubmit="saveCategoryForm(event)">
+
+      <input type="hidden" id="editingCatId" value="">
+
+      <div class="form-group">
+        <label id="labelCatAr">الاسم بالعربية (مثال: رياضة ⚽)</label>
+        <input id="catAr" required>
+      </div>
+
+      <div class="form-group">
+        <label id="labelCatEn">الاسم بالإنجليزية (مثال: Sports ⚽)</label>
+        <input id="catEn" required>
+      </div>
+
+      <button class="submit" id="catSubmitBtn" type="submit">
+        حفظ التصنيف
+      </button>
+
+      <button class="tool" id="catCancelBtn" type="button" style="display:none" onclick="cancelCatEdit()">
+        إلغاء
+      </button>
+
+    </form>
+
+    <br>
+    <div style="overflow-x:auto">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th id="thCatAr">العربية</th>
+            <th id="thCatEn">English</th>
+            <th id="thCatCount">عدد المواقع</th>
+            <th id="thCatActions">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="catsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
     <h3 id="manageSitesTitle">🗂️ إدارة المواقع</h3>
+    <div class="form-group" style="margin-top:12px">
+      <input
+        id="adminSearch"
+        type="text"
+        placeholder="🔍 ابحث عن موقع..."
+        oninput="renderSitesTable()"
+      >
+    </div>
     <div style="overflow-x:auto">
       <table class="admin-table">
         <thead>
@@ -776,236 +828,239 @@ const firebaseConfig = {
    DATABASE INITIAL (default sites)
    ===================================================== */
 
-const DATA_VERSION = 11; // bump this whenever defaultSites changes
+const DATA_VERSION = 12; // bump this whenever defaultSites changes
 
+/* Logos: simpleicons l l'brands l'kbira (b kolor dyalhom),
+   Google favicons l l'sites l'maghribiya — w ila chi link
+   t9te3, l'emoji kayrje3 automatiquement */
 const defaultSites = [
 
 /* TECH */
 { id:101, name:"Next Level PC", url:"https://nextlevelpc.ma", category:"tech",
   desc:"متجر مغربي متخصص في PC Gaming ومكونات الحاسوب واللوازم التقنية.",
-  icon:"🖥️" },
+  icon:"🖥️", image:"https://www.google.com/s2/favicons?domain=nextlevelpc.ma&sz=128" },
 
 { id:102, name:"Step Game", url:"https://setupgame.ma", category:"tech",
   desc:"متجر مغربي متخصص في PC Gaming وتجهيزات الألعاب.",
-  icon:"🎮" },
+  icon:"🎮", image:"https://www.google.com/s2/favicons?domain=setupgame.ma&sz=128" },
 
 { id:103, name:"Ultrapc Maroc", url:"https://www.ultrapc.ma", category:"tech",
   desc:"متجر للحواسيب ومكونات PC والإلكترونيات.",
-  icon:"💻" },
+  icon:"💻", image:"https://www.google.com/s2/favicons?domain=www.ultrapc.ma&sz=128" },
 
 { id:104, name:"Steam", url:"https://store.steampowered.com", category:"tech",
   desc:"منصة عالمية للألعاب على الحاسوب.",
-  icon:"🕹️" },
+  icon:"🕹️", image:"https://cdn.simpleicons.org/steam" },
 
 { id:105, name:"Epic Games", url:"https://store.epicgames.com", category:"tech",
   desc:"متجر ألعاب Epic Games.",
-  icon:"👻" },
+  icon:"👻", image:"https://cdn.simpleicons.org/epicgames" },
 
 { id:106, name:"PlayStation", url:"https://www.playstation.com", category:"tech",
   desc:"الموقع الرسمي لمنصة PlayStation.",
-  icon:"🎮" },
+  icon:"🎮", image:"https://cdn.simpleicons.org/playstation" },
 
 { id:107, name:"Xbox", url:"https://www.xbox.com", category:"tech",
   desc:"منصة Xbox وGame Pass.",
-  icon:"🎮" },
+  icon:"🎮", image:"https://cdn.simpleicons.org/xbox" },
 
 { id:108, name:"Apple", url:"https://www.apple.com/ma", category:"tech",
   desc:"الموقع الرسمي لشركة Apple.",
-  icon:"🍎" },
+  icon:"🍎", image:"https://cdn.simpleicons.org/apple" },
 
 { id:109, name:"Samsung", url:"https://www.samsung.com/n_africa", category:"tech",
   desc:"الموقع الرسمي لسامسونج في المنطقة.",
-  icon:"📱" },
+  icon:"📱", image:"https://cdn.simpleicons.org/samsung" },
 
 { id:110, name:"Xiaomi", url:"https://www.mi.com/ma", category:"tech",
   desc:"الموقع الرسمي لـ Xiaomi.",
-  icon:"📱" },
+  icon:"📱", image:"https://cdn.simpleicons.org/xiaomi" },
 
 
 /* STUDY */
 
 { id:201, name:"وزارة التربية الوطنية", url:"https://www.men.gov.ma", category:"study",
   desc:"الموقع الرسمي لوزارة التربية الوطنية والتعليم الأولي والرياضة.",
-  icon:"🏫" },
+  icon:"🏫", image:"https://www.google.com/s2/favicons?domain=www.men.gov.ma&sz=128" },
 
 { id:202, name:"Massar", url:"https://massarservice.men.gov.ma", category:"study",
   desc:"منصة مسار لتتبع النتائج والنقط والمسار الدراسي.",
-  icon:"🎓" },
+  icon:"🎓", image:"https://www.google.com/s2/favicons?domain=massarservice.men.gov.ma&sz=128" },
 
 { id:203, name:"MyWay OFPPT", url:"https://www.myway.ac.ma", category:"study",
   desc:"منصة OFPPT للتسجيل والتوجيه والتكوين المهني.",
-  icon:"💼" },
+  icon:"💼", image:"https://www.google.com/s2/favicons?domain=www.myway.ac.ma&sz=128" },
 
 { id:204, name:"TelmidTICE", url:"https://telmidtice.men.gov.ma", category:"study",
   desc:"منصة الدروس والمحتويات التعليمية الرقمية.",
-  icon:"📖" },
+  icon:"📖", image:"https://www.google.com/s2/favicons?domain=telmidtice.men.gov.ma&sz=128" },
 
 { id:205, name:"Minhaty", url:"https://www.minhaty.ma", category:"study",
   desc:"منصة المنحة الدراسية.",
-  icon:"💰" },
+  icon:"💰", image:"https://www.google.com/s2/favicons?domain=www.minhaty.ma&sz=128" },
 
 { id:206, name:"Bac Maroc", url:"https://bac.men.gov.ma", category:"study",
   desc:"منصة نتائج البكالوريا.",
-  icon:"🏅" },
+  icon:"🏅", image:"https://www.google.com/s2/favicons?domain=bac.men.gov.ma&sz=128" },
 
 { id:207, name:"Bac Diplôme", url:"https://bac.t3.technology", category:"study",
   desc:"منصة الشواهد الإلكترونية للبكالوريا.",
-  icon:"📜" },
+  icon:"📜", image:"https://www.google.com/s2/favicons?domain=bac.t3.technology&sz=128" },
 
 
 /* GOVERNMENT */
 
 { id:301, name:"Maroc.ma", url:"https://www.maroc.ma", category:"gov",
   desc:"البوابة الرسمية للمملكة المغربية.",
-  icon:"🇲🇦" },
+  icon:"🇲🇦", image:"https://www.google.com/s2/favicons?domain=www.maroc.ma&sz=128" },
 
 { id:302, name:"Watiqa", url:"https://www.watiqa.ma", category:"gov",
   desc:"خدمات طلب بعض الوثائق الإدارية.",
-  icon:"📄" },
+  icon:"📄", image:"https://www.google.com/s2/favicons?domain=www.watiqa.ma&sz=128" },
 
 { id:303, name:"Chikaya", url:"https://www.chikaya.ma", category:"gov",
   desc:"منصة الشكايات والملاحظات.",
-  icon:"💬" },
+  icon:"💬", image:"https://www.google.com/s2/favicons?domain=www.chikaya.ma&sz=128" },
 
 { id:304, name:"NARSA", url:"https://www.narsa.gov.ma", category:"gov",
   desc:"الوكالة الوطنية للسلامة الطرقية.",
-  icon:"🚗" },
+  icon:"🚗", image:"https://www.google.com/s2/favicons?domain=www.narsa.gov.ma&sz=128" },
 
 { id:305, name:"CNSS", url:"https://www.cnss.ma", category:"gov",
   desc:"الصندوق الوطني للضمان الاجتماعي.",
-  icon:"🛡️" },
+  icon:"🛡️", image:"https://www.google.com/s2/favicons?domain=www.cnss.ma&sz=128" },
 
 
 /* JOBS */
 
 { id:401, name:"ANAPEC", url:"https://www.anapec.org", category:"jobs",
   desc:"الوكالة الوطنية لإنعاش التشغيل والكفاءات.",
-  icon:"👔" },
+  icon:"👔", image:"https://www.google.com/s2/favicons?domain=www.anapec.org&sz=128" },
 
 { id:402, name:"Emploi Public", url:"https://www.emploi-public.ma", category:"jobs",
   desc:"بوابة مباريات الوظيفة العمومية.",
-  icon:"🏢" },
+  icon:"🏢", image:"https://www.google.com/s2/favicons?domain=www.emploi-public.ma&sz=128" },
 
 { id:403, name:"LinkedIn", url:"https://www.linkedin.com", category:"jobs",
   desc:"شبكة مهنية للبحث عن العمل وبناء العلاقات.",
-  icon:"💼" },
+  icon:"💼", image:"https://cdn.simpleicons.org/linkedin" },
 
 
 /* BANKS */
 
 { id:501, name:"CIH Bank", url:"https://www.cihbank.ma", category:"banks",
   desc:"الخدمات البنكية لـ CIH Bank.",
-  icon:"💳" },
+  icon:"💳", image:"https://www.google.com/s2/favicons?domain=www.cihbank.ma&sz=128" },
 
 { id:502, name:"Al Barid Bank", url:"https://www.albaridbank.ma", category:"banks",
   desc:"الخدمات البنكية لبريد بنك.",
-  icon:"💵" },
+  icon:"💵", image:"https://www.google.com/s2/favicons?domain=www.albaridbank.ma&sz=128" },
 
 
 /* TELECOM */
 
 { id:601, name:"Maroc Telecom", url:"https://www.iam.ma", category:"telecom",
   desc:"خدمات اتصالات المغرب.",
-  icon:"📶" },
+  icon:"📶", image:"https://www.google.com/s2/favicons?domain=www.iam.ma&sz=128" },
 
 { id:602, name:"Orange Maroc", url:"https://www.orange.ma", category:"telecom",
   desc:"خدمات الهاتف والإنترنت من Orange Maroc.",
-  icon:"📱" },
+  icon:"📱", image:"https://cdn.simpleicons.org/orange" },
 
 { id:603, name:"inwi", url:"https://www.inwi.ma", category:"telecom",
   desc:"خدمات الهاتف والإنترنت من inwi.",
-  icon:"📶" },
+  icon:"📶", image:"https://www.google.com/s2/favicons?domain=www.inwi.ma&sz=128" },
 
 
 /* SHOPPING */
 
 { id:701, name:"Avito Maroc", url:"https://www.avito.ma", category:"shopping",
   desc:"منصة الإعلانات والبيع والشراء في المغرب.",
-  icon:"🏬" },
+  icon:"🏬", image:"https://www.google.com/s2/favicons?domain=www.avito.ma&sz=128" },
 
 { id:702, name:"Jumia Maroc", url:"https://www.jumia.ma", category:"shopping",
   desc:"منصة التسوق الإلكتروني.",
-  icon:"🛒" },
+  icon:"🛒", image:"https://www.google.com/s2/favicons?domain=www.jumia.ma&sz=128" },
 
 { id:703, name:"Carrefour Maroc", url:"https://www.carrefour.ma", category:"shopping",
   desc:"موقع Carrefour Maroc.",
-  icon:"🛍️" },
+  icon:"🛍️", image:"https://www.google.com/s2/favicons?domain=www.carrefour.ma&sz=128" },
 
 { id:704, name:"AliExpress", url:"https://www.aliexpress.com", category:"shopping",
   desc:"منصة التسوق العالمية.",
-  icon:"📦" },
+  icon:"📦", image:"https://cdn.simpleicons.org/aliexpress" },
 
 
 /* TRAVEL */
 
 { id:801, name:"ONCF", url:"https://www.oncf.ma", category:"travel",
   desc:"المكتب الوطني للسكك الحديدية.",
-  icon:"🚆" },
+  icon:"🚆", image:"https://www.google.com/s2/favicons?domain=www.oncf.ma&sz=128" },
 
 { id:802, name:"Royal Air Maroc", url:"https://www.royalairmaroc.com", category:"travel",
   desc:"شركة الطيران الوطنية المغربية.",
-  icon:"✈️" },
+  icon:"✈️", image:"https://www.google.com/s2/favicons?domain=www.royalairmaroc.com&sz=128" },
 
 
 /* NEWS */
 
 { id:901, name:"Hespress", url:"https://www.hespress.com", category:"news",
   desc:"موقع إخباري مغربي.",
-  icon:"📰" },
+  icon:"📰", image:"https://www.google.com/s2/favicons?domain=www.hespress.com&sz=128" },
 
 { id:902, name:"Le360", url:"https://fr.le360.ma", category:"news",
   desc:"موقع إخباري مغربي.",
-  icon:"📰" },
+  icon:"📰", image:"https://www.google.com/s2/favicons?domain=fr.le360.ma&sz=128" },
 
 
 /* AI */
 
 { id:1001, name:"ChatGPT", url:"https://chatgpt.com", category:"ai",
   desc:"مساعد ذكاء اصطناعي للمحادثة والتعلم والبرمجة.",
-  icon:"🤖" },
+  icon:"🤖", image:"https://cdn.simpleicons.org/openai" },
 
 { id:1002, name:"Google Gemini", url:"https://gemini.google.com", category:"ai",
   desc:"مساعد الذكاء الاصطناعي من Google.",
-  icon:"✨" },
+  icon:"✨", image:"https://cdn.simpleicons.org/googlegemini" },
 
 { id:1003, name:"Claude", url:"https://claude.ai", category:"ai",
   desc:"مساعد ذكاء اصطناعي للكتابة والتحليل والبرمجة.",
-  icon:"🤖" },
+  icon:"🤖", image:"https://cdn.simpleicons.org/anthropic" },
 
 
 /* SOCIAL MEDIA */
 
 { id:1101, name:"YouTube", url:"https://www.youtube.com", category:"social",
   desc:"منصة الفيديو والمحتوى العالمية.",
-  icon:"▶️" },
+  icon:"▶️", image:"https://cdn.simpleicons.org/youtube" },
 
 { id:1102, name:"Instagram", url:"https://www.instagram.com", category:"social",
   desc:"منصة الصور والفيديوهات والتواصل الاجتماعي.",
-  icon:"📸" },
+  icon:"📸", image:"https://cdn.simpleicons.org/instagram" },
 
 { id:1103, name:"Facebook", url:"https://www.facebook.com", category:"social",
   desc:"شبكة التواصل الاجتماعي.",
-  icon:"👥" },
+  icon:"👥", image:"https://cdn.simpleicons.org/facebook" },
 
 { id:1104, name:"TikTok", url:"https://www.tiktok.com", category:"social",
   desc:"منصة الفيديوهات القصيرة.",
-  icon:"🎵" },
+  icon:"🎵", image:"https://cdn.simpleicons.org/tiktok" },
 
 { id:1105, name:"X", url:"https://x.com", category:"social",
   desc:"منصة التواصل والأخبار والنقاشات.",
-  icon:"✖️" },
+  icon:"✖️", image:"https://cdn.simpleicons.org/x" },
 
 { id:1106, name:"WhatsApp Web", url:"https://web.whatsapp.com", category:"social",
   desc:"استخدام WhatsApp من المتصفح.",
-  icon:"💬" },
+  icon:"💬", image:"https://cdn.simpleicons.org/whatsapp" },
 
 { id:1107, name:"Telegram", url:"https://web.telegram.org", category:"social",
   desc:"منصة التواصل والمراسلة.",
-  icon:"📨" },
+  icon:"📨", image:"https://cdn.simpleicons.org/telegram" },
 
 { id:1108, name:"Discord", url:"https://discord.com", category:"social",
   desc:"منصة التواصل والمجتمعات والمحادثات.",
-  icon:"🎮" },
+  icon:"🎮", image:"https://cdn.simpleicons.org/discord" },
 
 
 /* ENTERTAINMENT */
@@ -1034,6 +1089,7 @@ const FAV_KEY = "marochub_favorites_v7";
 const REPORT_KEY = "marochub_reports_v7";
 const THEME_KEY = "marochub_theme_v7";
 const LANG_KEY = "marochub_lang_v1";
+const CATS_KEY = "marochub_categories_v1";
 const VERSION_KEY = "marochub_data_version";
 
 /* Safe JSON parsing so a corrupted localStorage value
@@ -1191,6 +1247,26 @@ async function startCloud(){
 }
 
 async function cloudLoadAll(){
+  /* Categories: awal merra → seed; sinon khodhom mn cloud.
+     Ila l'rules ma sm7och l'collection (mazal ma tbdloch),
+     kankmlo b categories local bla ma n7bsou l'sit */
+  try{
+    const catsSnap = await cloud.collection(CATS_COLLECTION).get();
+    if(catsSnap.empty){
+      const batch = cloud.batch();
+      dbCategories.forEach((c, i) => {
+        batch.set(cloud.collection(CATS_COLLECTION).doc(c.id), { ...c, order: c.order ?? i });
+      });
+      await batch.commit();
+    }else{
+      dbCategories = catsSnap.docs.map(d => d.data()).filter(c => c && c.id);
+      sortCategories();
+      saveCatsCache();
+    }
+  }catch(e){
+    console.warn("Categories cloud unavailable — using local categories:", e);
+  }
+
   const sitesSnap = await cloud.collection(SITES_COLLECTION).get();
 
   if(sitesSnap.empty){
@@ -1212,7 +1288,7 @@ async function cloudLoadAll(){
   saveReports();
 
   if(needsDefaultsSync){
-    await syncMissingDefaults();
+    await syncDefaultUpdates();
   }
 
   /* Re-render b data jdad dyal cloud */
@@ -1221,6 +1297,7 @@ async function cloudLoadAll(){
   updateStats();
   if(document.getElementById("adminPage").classList.contains("active")){
     renderCategorySelect();
+    renderCatsTable();
     renderSitesTable();
     renderReports();
   }
@@ -1242,26 +1319,42 @@ async function cloudSeedCurrentData(){
   console.log("Seeded cloud with", db.length, "sites.");
 }
 
-/* Sites jdad f defaultSites (matalan Entertainment) li
-   ma kayninach f cloud — katzidhom merra wa7da */
-async function syncMissingDefaults(){
-  const existing = new Set(db.map(s => s.id));
-  const missing = defaultSites.filter(d => !existing.has(d.id));
-
-  if(!missing.length) return;
-
-  let order = db.reduce((m, s) => Math.max(m, s.order ?? 0), 0);
+/* Sites dyal defaults: katzid l'jdad w kat-updati l'9dam
+   (logos jdad, smiyat msel7a...) f cloud — clicks w
+   l'ordre kayb9aw dyal l'user */
+async function syncDefaultUpdates(){
+  const byId = new Map(db.map(s => [s.id, s]));
+  let maxOrder = db.reduce((m, s) => Math.max(m, s.order ?? 0), 0);
   const batch = cloud.batch();
+  let changed = false;
 
-  missing.forEach(d => {
-    order += 1;
-    const docData = { ...d, order };
-    batch.set(cloud.collection(SITES_COLLECTION).doc(String(d.id)), docData);
-    db.push(docData);
+  defaultSites.forEach(d => {
+    const existing = byId.get(d.id);
+
+    if(!existing){
+      maxOrder += 1;
+      const docData = { ...d, order: maxOrder };
+      batch.set(cloud.collection(SITES_COLLECTION).doc(String(d.id)), docData);
+      db.push(docData);
+      changed = true;
+      return;
+    }
+
+    const differs = ["name","url","category","desc","icon","image"]
+      .some(k => (existing[k] ?? null) !== (d[k] ?? null));
+
+    if(differs){
+      const merged = { ...existing, ...d };
+      batch.set(cloud.collection(SITES_COLLECTION).doc(String(d.id)), merged);
+      db[db.findIndex(s => s.id === d.id)] = merged;
+      changed = true;
+    }
   });
 
+  if(!changed) return;
+
   await batch.commit();
-  console.log("Synced", missing.length, "new default sites to cloud.");
+  console.log("Synced default sites updates to cloud.");
 
   sortSites();
   saveDB();
@@ -1276,34 +1369,51 @@ async function syncMissingDefaults(){
 
 
 /* =====================================================
-   CATEGORIES
+   CATEGORIES (dynami9a — zid / bddel / 7yd mn Admin,
+   kaytssauvegardo f cloud m3a l'nas kollhom)
    ===================================================== */
 
-const categories = [
- {id:"all",    ar:"الكل 🌐",                 en:"All 🌐"},
- {id:"tech",   ar:"التقنية والجيمنج 🎮",      en:"Tech & Gaming 🎮"},
- {id:"study",  ar:"الدراسة والتكوين 🎓",      en:"Study & Training 🎓"},
- {id:"gov",    ar:"الإدارة والخدمات 🏛️",      en:"Government 🏛️"},
- {id:"jobs",   ar:"العمل والتوظيف 💼",        en:"Jobs 💼"},
- {id:"banks",  ar:"البنوك والمالية 💳",       en:"Banks 💳"},
- {id:"telecom",ar:"الاتصالات 📱",            en:"Telecom 📱"},
- {id:"travel", ar:"السفر والنقل ✈️",         en:"Travel & Transport ✈️"},
- {id:"shopping",ar:"التسوق 🛒",              en:"Shopping 🛒"},
- {id:"news",   ar:"الأخبار 📰",              en:"News 📰"},
- {id:"ai",     ar:"الذكاء الاصطناعي 🤖",      en:"AI 🤖"},
- {id:"social", ar:"مواقع التواصل الاجتماعي 📱", en:"Social Media 📱"},
- {id:"entertainment", ar:"الترفيه 🎬",       en:"Entertainment 🎬"}
+const CATS_COLLECTION = "categories";
+
+const defaultCategories = [
+ {id:"all",    ar:"الكل 🌐",                 en:"All 🌐",               order:1},
+ {id:"tech",   ar:"التقنية والجيمنج 🎮",      en:"Tech & Gaming 🎮",     order:2},
+ {id:"study",  ar:"الدراسة والتكوين 🎓",      en:"Study & Training 🎓",  order:3},
+ {id:"gov",    ar:"الإدارة والخدمات 🏛️",      en:"Government 🏛️",        order:4},
+ {id:"jobs",   ar:"العمل والتوظيف 💼",        en:"Jobs 💼",              order:5},
+ {id:"banks",  ar:"البنوك والمالية 💳",       en:"Banks 💳",             order:6},
+ {id:"telecom",ar:"الاتصالات 📱",            en:"Telecom 📱",           order:7},
+ {id:"travel", ar:"السفر والنقل ✈️",         en:"Travel & Transport ✈️", order:8},
+ {id:"shopping",ar:"التسوق 🛒",              en:"Shopping 🛒",          order:9},
+ {id:"news",   ar:"الأخبار 📰",              en:"News 📰",              order:10},
+ {id:"ai",     ar:"الذكاء الاصطناعي 🤖",      en:"AI 🤖",                order:11},
+ {id:"social", ar:"مواقع التواصل الاجتماعي 📱", en:"Social Media 📱",    order:12},
+ {id:"entertainment", ar:"الترفيه 🎬",       en:"Entertainment 🎬",     order:13}
 ];
 
+let dbCategories = safeParse(localStorage.getItem(CATS_KEY), null);
+if(!Array.isArray(dbCategories) || !dbCategories.length){
+  dbCategories = [...defaultCategories];
+}
+
+function sortCategories(){
+  dbCategories.sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
+}
+sortCategories();
+
+function saveCatsCache(){
+  localStorage.setItem(CATS_KEY, JSON.stringify(dbCategories));
+}
+
 function catLabel(id){
-  const c = categories.find(x => x.id === id);
+  const c = dbCategories.find(x => x.id === id);
   if(!c) return id;
   return english ? c.en : c.ar;
 }
 
 function renderCategories(){
   const box = document.getElementById("categories");
-  box.innerHTML = categories.map(c => `
+  box.innerHTML = dbCategories.map(c => `
     <button class="cat ${currentCategory === c.id ? "active" : ""}" onclick="setCategory('${c.id}')">
       ${english ? c.en : c.ar}
     </button>
@@ -1313,11 +1423,148 @@ function renderCategories(){
 function renderCategorySelect(){
   const select = document.getElementById("siteCategory");
   const current = select.value;
-  select.innerHTML = categories
+  select.innerHTML = dbCategories
     .filter(c => c.id !== "all")
-    .map(c => `<option value="${c.id}">${english ? c.en : c.ar}</option>`)
+    .map(c => `<option value="${c.id}">${escapeHTML(english ? c.en : c.ar)}</option>`)
     .join("");
   if(current) select.value = current;
+}
+
+
+/* ---------- CRUD dyal l'categories ---------- */
+
+function slugify(text){
+  return String(text).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+async function saveCategoryForm(event){
+  event.preventDefault();
+
+  const editingCatId = document.getElementById("editingCatId").value;
+  const ar = document.getElementById("catAr").value.trim();
+  const en = document.getElementById("catEn").value.trim();
+  if(!ar || !en) return;
+
+  if(editingCatId){
+    const cat = dbCategories.find(c => c.id === editingCatId);
+    if(!cat) return;
+
+    const updated = { ...cat, ar, en };
+    if(cloudReady){
+      try{
+        await cloud.collection(CATS_COLLECTION).doc(cat.id).set(updated);
+      }catch(e){
+        alert(cloudErrorMsg(e));
+        return;
+      }
+    }
+    dbCategories[dbCategories.findIndex(c => c.id === editingCatId)] = updated;
+  }else{
+    const base = slugify(en) || ("cat" + Date.now());
+    let candidate = base;
+    let n = 1;
+    while(dbCategories.some(c => c.id === candidate)){
+      candidate = base + (++n);
+    }
+    const newCat = {
+      id: candidate,
+      ar, en,
+      order: dbCategories.reduce((m,c) => Math.max(m, c.order ?? 0), 0) + 1
+    };
+    if(cloudReady){
+      try{
+        await cloud.collection(CATS_COLLECTION).doc(newCat.id).set(newCat);
+      }catch(e){
+        alert(cloudErrorMsg(e));
+        return;
+      }
+    }
+    dbCategories.push(newCat);
+  }
+
+  sortCategories();
+  saveCatsCache();
+  event.target.reset();
+  cancelCatEdit();
+  renderCategories();
+  renderCategorySelect();
+  renderCatsTable();
+  renderSites();
+  renderSitesTable();
+  alert(english ? "Category saved successfully ✅" : "تم حفظ التصنيف بنجاح ✅");
+}
+
+function editCategory(id){
+  const cat = dbCategories.find(c => c.id === id);
+  if(!cat) return;
+
+  document.getElementById("editingCatId").value = cat.id;
+  document.getElementById("catAr").value = cat.ar;
+  document.getElementById("catEn").value = cat.en;
+  document.getElementById("catSubmitBtn").textContent = english ? "Update" : "تحديث التصنيف";
+  document.getElementById("catCancelBtn").style.display = "inline-block";
+  document.getElementById("catForm").scrollIntoView({ behavior:"smooth" });
+}
+
+function cancelCatEdit(){
+  document.getElementById("editingCatId").value = "";
+  document.getElementById("catSubmitBtn").textContent = english ? "Save" : "حفظ التصنيف";
+  document.getElementById("catCancelBtn").style.display = "none";
+}
+
+async function deleteCategory(id){
+  if(id === "all"){
+    alert(english ? "You cannot delete this category." : "لا يمكن حذف هذا التصنيف.");
+    return;
+  }
+
+  const count = db.filter(s => s.category === id).length;
+  if(count > 0){
+    alert(english
+      ? "This category contains " + count + " site(s). Move or delete them first."
+      : "هذا التصنيف فيه " + count + " موقع. نقلهم أو احذفهم أولاً.");
+    return;
+  }
+
+  if(!confirm(english ? "Delete this category?" : "حذف هذا التصنيف؟")) return;
+
+  if(cloudReady){
+    try{
+      await cloud.collection(CATS_COLLECTION).doc(id).delete();
+    }catch(e){
+      alert(cloudErrorMsg(e));
+      return;
+    }
+  }
+
+  dbCategories = dbCategories.filter(c => c.id !== id);
+  saveCatsCache();
+  renderCategories();
+  renderCategorySelect();
+  renderCatsTable();
+}
+
+function renderCatsTable(){
+  const body = document.getElementById("catsTableBody");
+
+  body.innerHTML = dbCategories.map(cat => {
+    const count = cat.id === "all" ? db.length : db.filter(s => s.category === cat.id).length;
+    const canManage = cat.id !== "all";
+    return `
+      <tr>
+        <td>${escapeHTML(cat.ar)}</td>
+        <td>${escapeHTML(cat.en)}</td>
+        <td>${count}</td>
+        <td>
+          ${canManage ? `
+          <div class="report-actions">
+            <button class="small-btn" onclick="editCategory('${cat.id}')">${english ? "Edit" : "تعديل"}</button>
+            <button class="small-btn" onclick="deleteCategory('${cat.id}')">${english ? "Delete" : "حذف"}</button>
+          </div>` : "—"}
+        </td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function setCategory(category){
@@ -1617,6 +1864,7 @@ function showPage(page){
 
   if(page === "admin"){
     renderCategorySelect();
+    renderCatsTable();
     renderSitesTable();
     renderReports();
     updateStats();
@@ -1633,9 +1881,28 @@ async function saveSiteForm(event){
   const name = document.getElementById("siteName").value.trim();
   const url = document.getElementById("siteUrl").value.trim();
   const category = document.getElementById("siteCategory").value;
-  const icon = document.getElementById("siteIcon").value.trim() || "🌐";
-  const image = document.getElementById("siteImage").value.trim();
+  let icon = document.getElementById("siteIcon").value.trim() || "🌐";
+  let image = document.getElementById("siteImage").value.trim();
   const desc = document.getElementById("siteDesc").value.trim();
+
+  /* Ila dkhel l'link f blaset l'emoji (champ sghir) → n7awloh l'image automatiquement */
+  if(icon.startsWith("http://") || icon.startsWith("https://")){
+    if(!image) image = icon;
+    icon = "🌐";
+  }
+
+  /* Nzid https:// automatiquement ila na9es */
+  if(image && !/^https?:\/\//i.test(image)){
+    image = "https://" + image;
+  }
+
+  /* Link dyal l'image khasso ykon s7i7 */
+  if(image && !isSafeUrl(image)){
+    alert(english
+      ? "The icon image link is not valid — it must be a direct image link starting with https://"
+      : "رابط صورة الأيقونة غير صحيح — خاصو يكون رابط مباشر للصورة يبدأ بـ https://");
+    return;
+  }
 
   if(!isSafeUrl(url)){
     alert(english ? "Please enter a valid http/https URL." : "المرجو إدخال رابط صحيح (http/https).");
@@ -1776,13 +2043,18 @@ async function confirmDelete(){
 
 function renderSitesTable(){
   const body = document.getElementById("sitesTableBody");
+  const q = (document.getElementById("adminSearch").value || "").trim().toLowerCase();
+  const list = db.filter(s => !q ||
+    s.name.toLowerCase().includes(q) ||
+    (s.url || "").toLowerCase().includes(q) ||
+    catLabel(s.category).toLowerCase().includes(q));
 
-  if(!db.length){
-    body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--sub);padding:20px">${english ? "No sites." : "لا توجد مواقع."}</td></tr>`;
+  if(!list.length){
+    body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--sub);padding:20px">${english ? "No sites found." : "لم يتم العثور على مواقع."}</td></tr>`;
     return;
   }
 
-  body.innerHTML = db.map(site => `
+  body.innerHTML = list.map(site => `
     <tr>
       <td>${escapeHTML(site.name)}</td>
       <td>${escapeHTML(catLabel(site.category))}</td>
@@ -1911,6 +2183,13 @@ const translations = {
     labelDesc:"الوصف",
     submitBtn:"حفظ الموقع",
     cancelEditBtn:"إلغاء التعديل",
+    manageCatsTitle:"🏷️ إدارة التصنيفات",
+    labelCatAr:"الاسم بالعربية (مثال: رياضة ⚽)",
+    labelCatEn:"الاسم بالإنجليزية (مثال: Sports ⚽)",
+    catSubmitBtn:"حفظ التصنيف",
+    catCancelBtn:"إلغاء",
+    thCatAr:"العربية", thCatEn:"English", thCatCount:"عدد المواقع", thCatActions:"إجراءات",
+    adminSearchPh:"🔍 ابحث عن موقع...",
     manageSitesTitle:"🗂️ إدارة المواقع",
     thName:"الاسم", thCategory:"التصنيف", thClicks:"الزيارات", thActions:"إجراءات",
     reportsTitle:"⚠️ التقارير",
@@ -1948,6 +2227,13 @@ const translations = {
     labelDesc:"Description",
     submitBtn:"Save",
     cancelEditBtn:"Cancel edit",
+    manageCatsTitle:"🏷️ Manage Categories",
+    labelCatAr:"Arabic name (e.g. رياضة ⚽)",
+    labelCatEn:"English name (e.g. Sports ⚽)",
+    catSubmitBtn:"Save",
+    catCancelBtn:"Cancel",
+    thCatAr:"Arabic", thCatEn:"English", thCatCount:"Sites", thCatActions:"Actions",
+    adminSearchPh:"🔍 Search a site...",
     manageSitesTitle:"🗂️ Manage Sites",
     thName:"Name", thCategory:"Category", thClicks:"Visits", thActions:"Actions",
     reportsTitle:"⚠️ Reports",
@@ -2002,6 +2288,20 @@ function applyTranslations(){
   document.getElementById("cancelEditBtn").textContent = t.cancelEditBtn;
 
   document.getElementById("manageSitesTitle").textContent = t.manageSitesTitle;
+
+  document.getElementById("manageCatsTitle").textContent = t.manageCatsTitle;
+  document.getElementById("labelCatAr").textContent = t.labelCatAr;
+  document.getElementById("labelCatEn").textContent = t.labelCatEn;
+  const editingCatId = document.getElementById("editingCatId").value;
+  document.getElementById("catSubmitBtn").textContent = editingCatId
+    ? (english ? "Update" : "تحديث التصنيف")
+    : t.catSubmitBtn;
+  document.getElementById("catCancelBtn").textContent = t.catCancelBtn;
+  document.getElementById("thCatAr").textContent = t.thCatAr;
+  document.getElementById("thCatEn").textContent = t.thCatEn;
+  document.getElementById("thCatCount").textContent = t.thCatCount;
+  document.getElementById("thCatActions").textContent = t.thCatActions;
+  document.getElementById("adminSearch").placeholder = t.adminSearchPh;
   document.getElementById("thName").textContent = t.thName;
   document.getElementById("thCategory").textContent = t.thCategory;
   document.getElementById("thClicks").textContent = t.thClicks;
