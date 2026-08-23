@@ -6,6 +6,14 @@
   <title>MarocHubOnline | دليل المواقع</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>">
 
+  <!-- ===================== PWA ===================== -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MarocHub">
+
   <!-- =====================================================
        FIREBASE (khassek ghir tbdel firebaseConfig lte7t f script)
        ===================================================== -->
@@ -224,6 +232,7 @@ nav{
   width:44px;
   height:44px;
   flex-shrink:0;
+  position:relative;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -231,6 +240,18 @@ nav{
   background:var(--bg);
   color:var(--accent);
   font-size:1.2rem;
+}
+
+/* Logo image (ex: Spotify) — kaytbda fo9 l'emoji;
+   ila t9te3 tchtafa w ybane l'emoji fallback */
+.icon img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  border-radius:10px;
+  background:var(--card);
 }
 
 .card-title{
@@ -472,6 +493,10 @@ nav{
   <div class="nav-tools">
     <span class="tool status" id="cloudBadge" title="...">⏳ ...</span>
 
+    <button class="tool" id="installBtn" onclick="installApp()" style="display:none">
+      📱 <span id="installBtnLabel">App</span>
+    </button>
+
     <button class="tool" onclick="toggleLanguage()">
       🌐 <span id="languageText">FR</span>
     </button>
@@ -512,6 +537,14 @@ nav{
   </div>
 
   <div id="categories" class="categories"></div>
+
+  <div id="topSection" style="display:none">
+    <h2 class="section-title" id="topTitle">
+      🔥 الأكثر زيارة
+    </h2>
+
+    <div id="topGrid" class="grid"></div>
+  </div>
 
   <div id="favoritesSection" style="display:none">
     <h2 class="section-title" id="favTitle">
@@ -595,6 +628,15 @@ nav{
       <div class="form-group">
         <label id="labelIcon">الأيقونة (إيموجي، مثال: 🌐)</label>
         <input id="siteIcon" placeholder="🌐" value="🌐" maxlength="8">
+      </div>
+
+      <div class="form-group">
+        <label id="labelImage">رابط صورة الأيقونة (اختيوري)</label>
+        <input
+          id="siteImage"
+          type="url"
+          placeholder="https://cdn.simpleicons.org/spotify"
+        >
       </div>
 
       <div class="form-group">
@@ -734,7 +776,7 @@ const firebaseConfig = {
    DATABASE INITIAL (default sites)
    ===================================================== */
 
-const DATA_VERSION = 10; // bump this whenever defaultSites changes
+const DATA_VERSION = 11; // bump this whenever defaultSites changes
 
 const defaultSites = [
 
@@ -963,7 +1005,22 @@ const defaultSites = [
 
 { id:1108, name:"Discord", url:"https://discord.com", category:"social",
   desc:"منصة التواصل والمجتمعات والمحادثات.",
-  icon:"🎮" }
+  icon:"🎮" },
+
+
+/* ENTERTAINMENT */
+
+{ id:1201, name:"Spotify", url:"https://open.spotify.com", category:"entertainment",
+  desc:"منصة الموسيقى والبودكاست العالمية.",
+  icon:"🎧", image:"https://cdn.simpleicons.org/spotify" },
+
+{ id:1202, name:"Netflix", url:"https://www.netflix.com/ma", category:"entertainment",
+  desc:"منصة الأفلام والمسلسلات العالمية.",
+  icon:"🍿", image:"https://cdn.simpleicons.org/netflix" },
+
+{ id:1203, name:"Twitch", url:"https://www.twitch.tv", category:"entertainment",
+  desc:"منصة البث المباشر للألعاب والترفيه.",
+  icon:"🎬", image:"https://cdn.simpleicons.org/twitch" }
 
 ];
 
@@ -1022,6 +1079,10 @@ if(!db){
 }
 
 localStorage.setItem(VERSION_KEY, String(DATA_VERSION));
+
+/* Ila had l'browser ma chefach had l'version dyal data, ghadi
+   nzido l'sites jdad (defaults) l cloud mn mor l'load */
+const needsDefaultsSync = storedVersion < DATA_VERSION;
 
 function sortSites(){
   db.sort((a,b) =>
@@ -1083,8 +1144,8 @@ function configIsFilled(){
 
 function cloudErrorMsg(err){
   console.error("Firebase error:", err);
-  if(french){
-    return "Erreur de connexion b Firebase: " + (err && err.code ? err.code : err);
+  if(english){
+    return "Firebase connection error: " + (err && err.code ? err.code : err);
   }
   return "Mochkil f connexion m3a Firebase: " + (err && err.code ? err.code : err);
 }
@@ -1094,10 +1155,10 @@ function setBadge(connected){
   if(!badge) return;
   if(connected){
     badge.textContent = "☁️ Cloud";
-    badge.title = "Mconnecté m3a Firebase — kolchi mchtark";
+    badge.title = "Connected to Firebase — data shared with everyone";
   }else{
     badge.textContent = "💾 Local";
-    badge.title = "Mode local — l'changes ma kaybanoch l'nas khrin";
+    badge.title = "Local mode — changes only visible to you";
   }
 }
 
@@ -1150,6 +1211,10 @@ async function cloudLoadAll(){
   saveDB();
   saveReports();
 
+  if(needsDefaultsSync){
+    await syncMissingDefaults();
+  }
+
   /* Re-render b data jdad dyal cloud */
   renderCategories();
   renderSites();
@@ -1177,37 +1242,70 @@ async function cloudSeedCurrentData(){
   console.log("Seeded cloud with", db.length, "sites.");
 }
 
+/* Sites jdad f defaultSites (matalan Entertainment) li
+   ma kayninach f cloud — katzidhom merra wa7da */
+async function syncMissingDefaults(){
+  const existing = new Set(db.map(s => s.id));
+  const missing = defaultSites.filter(d => !existing.has(d.id));
+
+  if(!missing.length) return;
+
+  let order = db.reduce((m, s) => Math.max(m, s.order ?? 0), 0);
+  const batch = cloud.batch();
+
+  missing.forEach(d => {
+    order += 1;
+    const docData = { ...d, order };
+    batch.set(cloud.collection(SITES_COLLECTION).doc(String(d.id)), docData);
+    db.push(docData);
+  });
+
+  await batch.commit();
+  console.log("Synced", missing.length, "new default sites to cloud.");
+
+  sortSites();
+  saveDB();
+  renderCategories();
+  renderSites();
+  updateStats();
+  if(document.getElementById("adminPage").classList.contains("active")){
+    renderCategorySelect();
+    renderSitesTable();
+  }
+}
+
 
 /* =====================================================
    CATEGORIES
    ===================================================== */
 
 const categories = [
- {id:"all",    ar:"الكل 🌐",                 fr:"Tous 🌐"},
- {id:"tech",   ar:"التقنية والجيمنج 🎮",      fr:"Tech & Gaming 🎮"},
- {id:"study",  ar:"الدراسة والتكوين 🎓",      fr:"Études & Formation 🎓"},
- {id:"gov",    ar:"الإدارة والخدمات 🏛️",      fr:"Administration 🏛️"},
- {id:"jobs",   ar:"العمل والتوظيف 💼",        fr:"Emploi 💼"},
- {id:"banks",  ar:"البنوك والمالية 💳",       fr:"Banques 💳"},
- {id:"telecom",ar:"الاتصالات 📱",            fr:"Télécoms 📱"},
- {id:"travel", ar:"السفر والنقل ✈️",         fr:"Voyage & Transport ✈️"},
- {id:"shopping",ar:"التسوق 🛒",              fr:"Shopping 🛒"},
- {id:"news",   ar:"الأخبار 📰",              fr:"Actualités 📰"},
- {id:"ai",     ar:"الذكاء الاصطناعي 🤖",      fr:"Intelligence Artificielle 🤖"},
- {id:"social", ar:"مواقع التواصل الاجتماعي 📱", fr:"Réseaux Sociaux 📱"}
+ {id:"all",    ar:"الكل 🌐",                 en:"All 🌐"},
+ {id:"tech",   ar:"التقنية والجيمنج 🎮",      en:"Tech & Gaming 🎮"},
+ {id:"study",  ar:"الدراسة والتكوين 🎓",      en:"Study & Training 🎓"},
+ {id:"gov",    ar:"الإدارة والخدمات 🏛️",      en:"Government 🏛️"},
+ {id:"jobs",   ar:"العمل والتوظيف 💼",        en:"Jobs 💼"},
+ {id:"banks",  ar:"البنوك والمالية 💳",       en:"Banks 💳"},
+ {id:"telecom",ar:"الاتصالات 📱",            en:"Telecom 📱"},
+ {id:"travel", ar:"السفر والنقل ✈️",         en:"Travel & Transport ✈️"},
+ {id:"shopping",ar:"التسوق 🛒",              en:"Shopping 🛒"},
+ {id:"news",   ar:"الأخبار 📰",              en:"News 📰"},
+ {id:"ai",     ar:"الذكاء الاصطناعي 🤖",      en:"AI 🤖"},
+ {id:"social", ar:"مواقع التواصل الاجتماعي 📱", en:"Social Media 📱"},
+ {id:"entertainment", ar:"الترفيه 🎬",       en:"Entertainment 🎬"}
 ];
 
 function catLabel(id){
   const c = categories.find(x => x.id === id);
   if(!c) return id;
-  return french ? c.fr : c.ar;
+  return english ? c.en : c.ar;
 }
 
 function renderCategories(){
   const box = document.getElementById("categories");
   box.innerHTML = categories.map(c => `
     <button class="cat ${currentCategory === c.id ? "active" : ""}" onclick="setCategory('${c.id}')">
-      ${french ? c.fr : c.ar}
+      ${english ? c.en : c.ar}
     </button>
   `).join("");
 }
@@ -1217,7 +1315,7 @@ function renderCategorySelect(){
   const current = select.value;
   select.innerHTML = categories
     .filter(c => c.id !== "all")
-    .map(c => `<option value="${c.id}">${french ? c.fr : c.ar}</option>`)
+    .map(c => `<option value="${c.id}">${english ? c.en : c.ar}</option>`)
     .join("");
   if(current) select.value = current;
 }
@@ -1242,18 +1340,22 @@ function isSafeUrl(url){
   }
 }
 
-function createCard(site){
+function createCard(site, rank){
   const isFav = favorites.includes(site.id);
   const safeUrl = isSafeUrl(site.url) ? site.url : "#";
+  const imageTag = site.image && isSafeUrl(site.image)
+    ? `<img src="${escapeHTML(site.image)}" alt="" loading="lazy" onerror="this.remove()">`
+    : "";
 
   return `
     <article class="card">
       <div class="card-head">
         <div class="icon">
           ${escapeHTML(site.icon || "🌐")}
+          ${imageTag}
         </div>
         <div class="card-title">
-          ${escapeHTML(site.name)}
+          ${rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : ""} ${escapeHTML(site.name)}
         </div>
       </div>
 
@@ -1268,15 +1370,15 @@ function createCard(site){
           target="_blank"
           rel="noopener noreferrer"
           onclick="registerClick(${site.id})">
-          ${french ? "Visiter" : "زيارة الموقع"} ↗
+          ${english ? "Visit" : "زيارة الموقع"} ↗
         </a>
 
         <div class="action-buttons">
-          <button class="action-btn ${isFav ? "fav" : ""}" onclick="toggleFavorite(${site.id})" title="${french ? "Favoris" : "المفضلة"}">
+          <button class="action-btn ${isFav ? "fav" : ""}" onclick="toggleFavorite(${site.id})" title="${english ? "Favorites" : "المفضلة"}">
             ⭐
           </button>
 
-          <button class="action-btn" onclick="openReport(${site.id})" title="${french ? "Signaler" : "تبليغ"}">
+          <button class="action-btn" onclick="openReport(${site.id})" title="${english ? "Report" : "تبليغ"}">
             ⚠️
           </button>
         </div>
@@ -1303,12 +1405,13 @@ function renderSites(){
   });
 
   if(!filtered.length){
-    grid.innerHTML = `<div class="empty">${french ? "Aucun site trouvé 🔎" : "لم نجد أي موقع مطابق للبحث 🔎"}</div>`;
+    grid.innerHTML = `<div class="empty">${english ? "No sites found 🔎" : "لم نجد أي موقع مطابق للبحث 🔎"}</div>`;
   }else{
-    grid.innerHTML = filtered.map(createCard).join("");
+    grid.innerHTML = filtered.map(site => createCard(site)).join("");
   }
 
   renderFavorites();
+  renderTopSites();
 }
 
 
@@ -1338,7 +1441,37 @@ function renderFavorites(){
   }
 
   section.style.display = "block";
-  grid.innerHTML = favSites.map(createCard).join("");
+  grid.innerHTML = favSites.map(site => createCard(site)).join("");
+}
+
+
+/* =====================================================
+   TOP SITES (الأكثر زيارة) — top 6 b l'clicks
+   Katbane ghir f l'page l'assassiya (bla recherche/filter)
+   ===================================================== */
+
+function renderTopSites(){
+  const section = document.getElementById("topSection");
+  const grid = document.getElementById("topGrid");
+  const search = document.getElementById("searchInput").value.trim().toLowerCase();
+
+  if(currentCategory !== "all" || search){
+    section.style.display = "none";
+    return;
+  }
+
+  const top = db
+    .filter(site => (site.clicks || 0) > 0)
+    .sort((a,b) => (b.clicks || 0) - (a.clicks || 0))
+    .slice(0, 6);
+
+  if(!top.length){
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  grid.innerHTML = top.map((site, i) => createCard(site, i)).join("");
 }
 
 
@@ -1383,7 +1516,7 @@ async function submitReport(){
   const site = db.find(x => x.id === id);
 
   if(!site || !reason){
-    alert(french ? "Merci d'indiquer la raison du signalement." : "كتب سبب التبليغ أولا.");
+    alert(english ? "Please enter the reason for the report." : "كتب سبب التبليغ أولا.");
     return;
   }
 
@@ -1392,7 +1525,7 @@ async function submitReport(){
     siteId: id,
     siteName: site.name,
     reason: reason,
-    date: new Date().toLocaleString(french ? "fr-MA" : "ar-MA")
+    date: new Date().toLocaleString(english ? "en-GB" : "ar-MA")
   };
 
   if(cloudReady){
@@ -1407,7 +1540,7 @@ async function submitReport(){
   reports.push(report);
   saveReports();
   closeReport();
-  alert(french ? "Signalement envoyé avec succès ✅" : "تم إرسال التبليغ بنجاح ✅");
+  alert(english ? "Report sent successfully ✅" : "تم إرسال التبليغ بنجاح ✅");
   updateStats();
   if(document.getElementById("adminPage").classList.contains("active")){
     renderReports();
@@ -1437,7 +1570,7 @@ function renderReports(){
   const box = document.getElementById("reportsList");
 
   if(!reports.length){
-    box.innerHTML = `<p style="color:var(--sub);margin-top:15px">${french ? "Aucun signalement pour le moment." : "لا توجد تقارير حالياً."}</p>`;
+    box.innerHTML = `<p style="color:var(--sub);margin-top:15px">${english ? "No reports for now." : "لا توجد تقارير حالياً."}</p>`;
     return;
   }
 
@@ -1449,7 +1582,7 @@ function renderReports(){
         <small style="color:var(--sub)">${escapeHTML(report.date)}</small>
       </div>
       <div class="report-actions">
-        <button class="small-btn" onclick="deleteReport(${report.id})">${french ? "Supprimer" : "حذف"}</button>
+        <button class="small-btn" onclick="deleteReport(${report.id})">${english ? "Delete" : "حذف"}</button>
       </div>
     </div>
   `).join("");
@@ -1463,7 +1596,7 @@ function renderReports(){
 let pendingDeleteId = null;
 
 function openAdmin(){
-  const password = prompt(french ? "Entrez le mot de passe Admin :" : "أدخل كلمة سر Admin:");
+  const password = prompt(english ? "Enter the Admin password:" : "أدخل كلمة سر Admin:");
 
   /*
     NOTE:
@@ -1471,7 +1604,7 @@ function openAdmin(){
     Password kayban f source code — li bgha ychoufo yl9ah.
   */
   if(password !== "admin123"){
-    alert(french ? "Mot de passe incorrect ❌" : "كلمة السر غير صحيحة ❌");
+    alert(english ? "Wrong password ❌" : "كلمة السر غير صحيحة ❌");
     return;
   }
 
@@ -1501,10 +1634,11 @@ async function saveSiteForm(event){
   const url = document.getElementById("siteUrl").value.trim();
   const category = document.getElementById("siteCategory").value;
   const icon = document.getElementById("siteIcon").value.trim() || "🌐";
+  const image = document.getElementById("siteImage").value.trim();
   const desc = document.getElementById("siteDesc").value.trim();
 
   if(!isSafeUrl(url)){
-    alert(french ? "Merci d'entrer une URL http/https valide." : "المرجو إدخال رابط صحيح (http/https).");
+    alert(english ? "Please enter a valid http/https URL." : "المرجو إدخال رابط صحيح (http/https).");
     return;
   }
 
@@ -1515,7 +1649,7 @@ async function saveSiteForm(event){
 
     const updated = {
       id: site.id,
-      name, url, category, icon, desc,
+      name, url, category, icon, image, desc,
       clicks: site.clicks || 0,
       order: site.order ?? allocateOrder()
     };
@@ -1536,7 +1670,7 @@ async function saveSiteForm(event){
     /* ---- AJOUT ---- */
     const newSite = {
       id: allocateId(),
-      name, url, category, icon, desc,
+      name, url, category, icon, image, desc,
       clicks: 0,
       order: allocateOrder()
     };
@@ -1560,7 +1694,7 @@ async function saveSiteForm(event){
   renderSites();
   renderSitesTable();
   updateStats();
-  alert(french ? "Site enregistré avec succès ✅" : "تمت إضافة الموقع بنجاح ✅");
+  alert(english ? "Site saved successfully ✅" : "تمت إضافة الموقع بنجاح ✅");
 }
 
 function editSite(id){
@@ -1573,9 +1707,10 @@ function editSite(id){
   renderCategorySelect();
   document.getElementById("siteCategory").value = site.category;
   document.getElementById("siteIcon").value = site.icon;
+  document.getElementById("siteImage").value = site.image || "";
   document.getElementById("siteDesc").value = site.desc;
 
-  document.getElementById("submitBtn").textContent = french ? "Mettre à jour" : "تحديث الموقع";
+  document.getElementById("submitBtn").textContent = english ? "Update" : "تحديث الموقع";
   document.getElementById("cancelEditBtn").style.display = "inline-block";
 
   document.getElementById("siteForm").scrollIntoView({behavior:"smooth"});
@@ -1583,7 +1718,7 @@ function editSite(id){
 
 function cancelEdit(){
   document.getElementById("editingId").value = "";
-  document.getElementById("submitBtn").textContent = french ? "Enregistrer" : "حفظ الموقع";
+  document.getElementById("submitBtn").textContent = english ? "Save" : "حفظ الموقع";
   document.getElementById("cancelEditBtn").style.display = "none";
 }
 
@@ -1643,7 +1778,7 @@ function renderSitesTable(){
   const body = document.getElementById("sitesTableBody");
 
   if(!db.length){
-    body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--sub);padding:20px">${french ? "Aucun site." : "لا توجد مواقع."}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--sub);padding:20px">${english ? "No sites." : "لا توجد مواقع."}</td></tr>`;
     return;
   }
 
@@ -1654,8 +1789,8 @@ function renderSitesTable(){
       <td>${site.clicks || 0}</td>
       <td>
         <div class="report-actions">
-          <button class="small-btn" onclick="editSite(${site.id})">${french ? "Modifier" : "تعديل"}</button>
-          <button class="small-btn" onclick="askDeleteSite(${site.id})">${french ? "Supprimer" : "حذف"}</button>
+          <button class="small-btn" onclick="editSite(${site.id})">${english ? "Edit" : "تعديل"}</button>
+          <button class="small-btn" onclick="askDeleteSite(${site.id})">${english ? "Delete" : "حذف"}</button>
         </div>
       </td>
     </tr>
@@ -1669,6 +1804,47 @@ function updateStats(){
 
   const clicks = db.reduce((sum,site) => sum + (site.clicks || 0), 0);
   document.getElementById("totalClicks").textContent = clicks;
+
+  renderTopSites();
+}
+
+
+/* =====================================================
+   APP INSTALL (PWA)
+   Chrome/Android kay3ti prompt officiel;
+   Safari/iOS kaytexplainin l'tari9a b alert
+   ===================================================== */
+
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+window.addEventListener("appinstalled", () => {
+  const btn = document.getElementById("installBtn");
+  if(btn) btn.style.display = "none";
+});
+
+function updateInstallButton(){
+  const btn = document.getElementById("installBtn");
+  if(!btn) return;
+  const standalone = window.matchMedia("(display-mode: standalone)").matches;
+  btn.style.display = standalone ? "none" : "inline-block";
+}
+
+async function installApp(){
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    return;
+  }
+
+  alert(english
+    ? "To install the app:\n\n📱 Android (Chrome): menu ⋮ → \"Install app\"\n🍎 iPhone (Safari): Share → \"Add to Home Screen\""
+    : "لتثبيت التطبيق:\n\n📱 أندرويد (كروم): القائمة ⋮ → «تثبيت التطبيق»\n🍎 آيفون (سفاري): مشاركة → «إضافة إلى الشاشة الرئيسية»");
 }
 
 
@@ -1683,6 +1859,12 @@ function toggleTheme(){
 
   html.setAttribute("data-theme", target);
   localStorage.setItem(THEME_KEY, target);
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if(metaTheme){
+    metaTheme.setAttribute("content", target === "dark" ? "#0f172a" : "#f8fafc");
+  }
+
   updateThemeIcon();
 }
 
@@ -1701,7 +1883,9 @@ if(savedTheme){
    LANGUAGE
    ===================================================== */
 
-let french = localStorage.getItem(LANG_KEY) === "fr";
+/* "fr" (l'ancienne langue) kaytqra b7al "en" bach l'users l'9dam ma yaadich 3la 3arabiya */
+const savedLang = localStorage.getItem(LANG_KEY);
+let english = savedLang === "en" || savedLang === "fr";
 
 const translations = {
   ar:{
@@ -1709,6 +1893,7 @@ const translations = {
     subtitle:"جميع المواقع المهمة للدراسة، العمل، التقنية، التواصل والخدمات في مكان واحد.",
     searchPlaceholder:"ابحث عن موقع...",
     favTitle:"⭐ المفضلة",
+    topTitle:"🔥 الأكثر زيارة",
     dirTitle:"🌐 دليل المواقع",
     adminBtn:"Admin",
     adminTitle:"👑 لوحة تحكم Admin",
@@ -1722,6 +1907,7 @@ const translations = {
     labelUrl:"الرابط",
     labelCategory:"التصنيف",
     labelIcon:"الأيقونة (إيموجي، مثال: 🌐)",
+    labelImage:"رابط صورة الأيقونة (اختياري — مثال لوجو Spotify)",
     labelDesc:"الوصف",
     submitBtn:"حفظ الموقع",
     cancelEditBtn:"إلغاء التعديل",
@@ -1736,55 +1922,60 @@ const translations = {
     deleteModalTitle:"🗑️ تأكيد الحذف",
     deleteModalDesc:"هل أنت متأكد أنك تريد حذف هذا الموقع؟ هذا الإجراء لا يمكن التراجع عنه.",
     deleteConfirmBtn:"حذف",
-    deleteCancelBtn:"إلغاء"
+    deleteCancelBtn:"إلغاء",
+    installTitle:"ثبّت التطبيق 📱"
   },
-  fr:{
-    title:"Annuaire des sites marocains et internationaux 🇲🇦",
-    subtitle:"Tous les sites utiles pour les études, le travail, la technologie et les services.",
-    searchPlaceholder:"Rechercher un site...",
-    favTitle:"⭐ Favoris",
-    dirTitle:"🌐 Annuaire des sites",
+  en:{
+    title:"The ultimate directory of Moroccan & international sites 🇲🇦",
+    subtitle:"All the important sites for study, work, tech, social and services in one place.",
+    searchPlaceholder:"Search for a site...",
+    favTitle:"⭐ Favorites",
+    topTitle:"🔥 Most Visited",
+    dirTitle:"🌐 Site Directory",
     adminBtn:"Admin",
-    adminTitle:"👑 Panneau Admin",
-    backBtn:"Retour",
+    adminTitle:"👑 Admin Panel",
+    backBtn:"Back",
     statSites:"Sites",
-    statReports:"Signalements",
-    statFav:"Favoris",
-    statClicks:"Visites",
-    addSiteTitle:"➕ Ajouter un nouveau site",
-    labelName:"Nom du site",
-    labelUrl:"Lien",
-    labelCategory:"Catégorie",
-    labelIcon:"Icône (emoji, ex: 🌐)",
+    statReports:"Reports",
+    statFav:"Favorites",
+    statClicks:"Visits",
+    addSiteTitle:"➕ Add a new site",
+    labelName:"Site name",
+    labelUrl:"Link",
+    labelCategory:"Category",
+    labelIcon:"Icon (emoji, e.g. 🌐)",
+    labelImage:"Icon image URL (optional — e.g. Spotify logo)",
     labelDesc:"Description",
-    submitBtn:"Enregistrer",
-    cancelEditBtn:"Annuler la modification",
-    manageSitesTitle:"🗂️ Gestion des sites",
-    thName:"Nom", thCategory:"Catégorie", thClicks:"Visites", thActions:"Actions",
-    reportsTitle:"⚠️ Signalements",
-    reportModalTitle:"⚠️ Signaler un lien",
-    reportModalDesc:"Si le lien ne fonctionne pas, dites-nous ce qui ne va pas.",
-    labelReason:"Raison",
-    reportSendBtn:"Envoyer",
-    reportCancelBtn:"Annuler",
-    deleteModalTitle:"🗑️ Confirmer la suppression",
-    deleteModalDesc:"Voulez-vous vraiment supprimer ce site ? Cette action est irréversible.",
-    deleteConfirmBtn:"Supprimer",
-    deleteCancelBtn:"Annuler"
+    submitBtn:"Save",
+    cancelEditBtn:"Cancel edit",
+    manageSitesTitle:"🗂️ Manage Sites",
+    thName:"Name", thCategory:"Category", thClicks:"Visits", thActions:"Actions",
+    reportsTitle:"⚠️ Reports",
+    reportModalTitle:"⚠️ Report a link",
+    reportModalDesc:"If the link doesn't work, tell us what's wrong.",
+    labelReason:"Reason",
+    reportSendBtn:"Send",
+    reportCancelBtn:"Cancel",
+    deleteModalTitle:"🗑️ Confirm deletion",
+    deleteModalDesc:"Are you sure you want to delete this site? This action cannot be undone.",
+    deleteConfirmBtn:"Delete",
+    deleteCancelBtn:"Cancel",
+    installTitle:"Install the app 📱"
   }
 };
 
 function applyTranslations(){
-  const t = translations[french ? "fr" : "ar"];
+  const t = translations[english ? "en" : "ar"];
 
-  document.getElementById("languageText").textContent = french ? "AR" : "FR";
-  document.documentElement.lang = french ? "fr" : "ar";
-  document.documentElement.dir = french ? "ltr" : "rtl";
+  document.getElementById("languageText").textContent = english ? "AR" : "EN";
+  document.documentElement.lang = english ? "en" : "ar";
+  document.documentElement.dir = english ? "ltr" : "rtl";
 
   document.getElementById("title").textContent = t.title;
   document.getElementById("subtitle").textContent = t.subtitle;
   document.getElementById("searchInput").placeholder = t.searchPlaceholder;
   document.getElementById("favTitle").textContent = t.favTitle;
+  document.getElementById("topTitle").textContent = t.topTitle;
   document.getElementById("dirTitle").textContent = t.dirTitle;
 
   document.querySelector('[data-i18n="adminBtn"]').textContent = t.adminBtn;
@@ -1801,11 +1992,12 @@ function applyTranslations(){
   document.getElementById("labelUrl").textContent = t.labelUrl;
   document.getElementById("labelCategory").textContent = t.labelCategory;
   document.getElementById("labelIcon").textContent = t.labelIcon;
+  document.getElementById("labelImage").textContent = t.labelImage;
   document.getElementById("labelDesc").textContent = t.labelDesc;
 
   const editingId = document.getElementById("editingId").value;
   document.getElementById("submitBtn").textContent = editingId
-    ? (french ? "Mettre à jour" : "تحديث الموقع")
+    ? (english ? "Mettre à jour" : "تحديث الموقع")
     : t.submitBtn;
   document.getElementById("cancelEditBtn").textContent = t.cancelEditBtn;
 
@@ -1827,6 +2019,8 @@ function applyTranslations(){
   document.getElementById("deleteConfirmBtn").textContent = t.deleteConfirmBtn;
   document.getElementById("deleteCancelBtn").textContent = t.deleteCancelBtn;
 
+  document.getElementById("installBtn").title = t.installTitle;
+
   renderCategories();
   renderCategorySelect();
   renderSites();
@@ -1837,8 +2031,8 @@ function applyTranslations(){
 }
 
 function toggleLanguage(){
-  french = !french;
-  localStorage.setItem(LANG_KEY, french ? "fr" : "ar");
+  english = !english;
+  localStorage.setItem(LANG_KEY, english ? "en" : "ar");
   applyTranslations();
 }
 
@@ -1868,7 +2062,22 @@ function escapeHTML(value){
 applyTranslations();
 updateThemeIcon();
 updateStats();
+updateInstallButton();
 startCloud();
+
+/* =====================================================
+   PWA — Service Worker (app installable + offline)
+   Katkhdmo ghir mn https (GitHub Pages) — f local
+   file:// katfchel b chwiya w hadchi normal
+   ===================================================== */
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(err =>
+      console.warn("Service worker registration skipped:", err)
+    );
+  });
+}
 
 </script>
 
