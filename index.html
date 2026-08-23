@@ -554,6 +554,10 @@ nav{
         oninput="renderSites()"
       >
     </div>
+
+    <button class="tool" onclick="openSuggest()" style="margin-top:5px">
+      💡 <span id="suggestBtnText">اقترح موقع</span>
+    </button>
   </div>
 
   <div id="categories" class="categories"></div>
@@ -619,6 +623,11 @@ nav{
     <div class="stat">
       <strong id="totalClicks">0</strong>
       <span id="statClicks">الزيارات</span>
+    </div>
+
+    <div class="stat">
+      <strong id="totalSuggestions">0</strong>
+      <span id="statSuggestions">اقتراحات</span>
     </div>
   </div>
 
@@ -726,6 +735,11 @@ nav{
   </div>
 
   <div class="panel">
+    <h3 id="suggestionsTitle">💡 اقتراحات المواقع</h3>
+    <div id="suggestionsList"></div>
+  </div>
+
+  <div class="panel">
     <h3 id="manageSitesTitle">🗂️ إدارة المواقع</h3>
     <div class="form-group" style="margin-top:12px">
       <input
@@ -756,6 +770,54 @@ nav{
   </div>
 
 </section>
+
+</div>
+
+
+<!-- SUGGEST SITE MODAL (visitors) -->
+<div id="suggestModal" class="modal">
+
+  <div class="modal-box">
+
+    <h3 id="suggestTitle">💡 اقترح موقع</h3>
+
+    <p style="color:var(--sub);margin:8px 0 15px" id="suggestDesc">
+      عندك موقع مفيد؟ شاركو معانا — غادي يتemecheck من بعد يتنشر!
+    </p>
+
+    <div class="form-group">
+      <label id="sugLabelName">اسم الموقع</label>
+      <input id="sugName">
+    </div>
+
+    <div class="form-group">
+      <label id="sugLabelUrl">الرابط</label>
+      <input id="sugUrl" type="text" placeholder="https://example.com">
+    </div>
+
+    <div class="form-group">
+      <label id="sugLabelCategory">التصنيف</label>
+      <select id="sugCategory"></select>
+    </div>
+
+    <div class="form-group">
+      <label id="sugLabelDesc">الوصف (اختياري)</label>
+      <textarea id="sugDesc" rows="3"></textarea>
+    </div>
+
+    <div class="modal-actions">
+
+      <button class="submit" id="suggestSendBtn" onclick="submitSuggestion()">
+        إرسال
+      </button>
+
+      <button class="tool" id="suggestCancelBtn" onclick="closeSuggest()">
+        إلغاء
+      </button>
+
+    </div>
+
+  </div>
 
 </div>
 
@@ -1174,6 +1236,8 @@ let db = safeParse(localStorage.getItem(DB_KEY), null);
 let favorites = safeParse(localStorage.getItem(FAV_KEY), []);
 let reports = safeParse(localStorage.getItem(REPORT_KEY), []);
 let reportsLoaded = false; // reports cloud kaytjibo ghir l Admin (auth)
+let suggestions = [];
+let suggestionsLoaded = false; // hta hadi ghir l Admin (auth)
 let storedVersion = Number(localStorage.getItem(VERSION_KEY) || 0);
 
 /*
@@ -1935,6 +1999,168 @@ function renderReports(){
 
 
 /* =====================================================
+   SUGGESTIONS (9te7 site — mn l'nas)
+   ===================================================== */
+
+const SUGGESTIONS_COLLECTION = "suggestions";
+
+function openSuggest(){
+  const select = document.getElementById("sugCategory");
+  select.innerHTML = dbCategories
+    .filter(c => c.id !== "all")
+    .map(c => `<option value="${c.id}">${escapeHTML(english ? c.en : c.ar)}</option>`)
+    .join("");
+  document.getElementById("suggestModal").classList.add("active");
+}
+
+function closeSuggest(){
+  document.getElementById("suggestModal").classList.remove("active");
+}
+
+async function submitSuggestion(){
+  const name = document.getElementById("sugName").value.trim();
+  let url = document.getElementById("sugUrl").value.trim();
+  const category = document.getElementById("sugCategory").value;
+  const desc = document.getElementById("sugDesc").value.trim();
+
+  if(!name){
+    alert(english ? "Please enter the site name." : "المرجو إدخال اسم الموقع.");
+    return;
+  }
+
+  if(url && !/^https?:\/\//i.test(url)){
+    url = "https://" + url;
+  }
+  if(!isSafeUrl(url)){
+    alert(english ? "Please enter a valid http/https URL." : "المرجو إدخال رابط صحيح (http/https).");
+    return;
+  }
+
+  if(!cloudReady){
+    alert(english ? "Connection problem — please try again later." : "مشكل في الاتصال — حاول مرة أخرى لاحقاً.");
+    return;
+  }
+
+  const suggestion = {
+    id: Date.now(),
+    name, url,
+    category: category || "tech",
+    desc: desc,
+    date: new Date().toLocaleString(english ? "en-GB" : "ar-MA")
+  };
+
+  try{
+    await cloud.collection(SUGGESTIONS_COLLECTION).doc(String(suggestion.id)).set(suggestion);
+  }catch(e){
+    alert(cloudErrorMsg(e));
+    return;
+  }
+
+  suggestions.push(suggestion);
+  closeSuggest();
+  document.getElementById("sugName").value = "";
+  document.getElementById("sugUrl").value = "";
+  document.getElementById("sugDesc").value = "";
+
+  alert(english ? "Thank you! We received your suggestion ✅" : "شكراً! توصلنا باقتراحك ✅");
+
+  if(document.getElementById("adminPage").classList.contains("active")){
+    renderSuggestions();
+    updateStats();
+  }
+}
+
+async function ensureSuggestionsLoaded(){
+  if(!cloudReady || suggestionsLoaded) return;
+  suggestionsLoaded = true;
+
+  try{
+    const snap = await cloud.collection(SUGGESTIONS_COLLECTION).get();
+    suggestions = snap.docs.map(d => d.data()).filter(s => s && s.id);
+  }catch(e){
+    console.warn("Suggestions cloud load failed:", e);
+  }
+
+  renderSuggestions();
+  updateStats();
+}
+
+function renderSuggestions(){
+  const box = document.getElementById("suggestionsList");
+
+  if(!suggestions.length){
+    box.innerHTML = `<p style="color:var(--sub);margin-top:15px">${english ? "No suggestions yet." : "لا توجد اقتراحات حالياً."}</p>`;
+    return;
+  }
+
+  box.innerHTML = suggestions.map(s => `
+    <div class="report">
+      <div>
+        <strong>${escapeHTML(s.name)}</strong> <span style="color:var(--sub)">(${escapeHTML(catLabel(s.category))})</span>
+        <p style="color:var(--sub)">${escapeHTML(s.url)}</p>
+        ${s.desc ? `<p style="color:var(--sub)">${escapeHTML(s.desc)}</p>` : ""}
+        <small style="color:var(--sub)">${escapeHTML(s.date || "")}</small>
+      </div>
+      <div class="report-actions">
+        <button class="small-btn" onclick="acceptSuggestion(${s.id})">${english ? "✅ Accept" : "✅ قبول"}</button>
+        <button class="small-btn" onclick="deleteSuggestion(${s.id})">${english ? "Delete" : "حذف"}</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* Accept: 3ammar form dyal l'ziyada b data dyal suggestion
+   (w logo favicon automatique) w kayms7 suggestion */
+async function acceptSuggestion(id){
+  const s = suggestions.find(x => x.id === id);
+  if(!s) return;
+
+  document.getElementById("editingId").value = "";
+  document.getElementById("siteName").value = s.name;
+  document.getElementById("siteUrl").value = s.url;
+  renderCategorySelect();
+  const validCat = dbCategories.some(c => c.id === s.category);
+  document.getElementById("siteCategory").value = validCat ? s.category : "tech";
+  document.getElementById("siteIcon").value = "🌐";
+
+  let host = "";
+  try{ host = new URL(s.url).hostname; }catch(e){}
+  document.getElementById("siteImage").value = host
+    ? "https://www.google.com/s2/favicons?domain=" + host + "&sz=128"
+    : "";
+
+  document.getElementById("siteDesc").value = s.desc || "";
+  document.getElementById("cancelEditBtn").style.display = "none";
+  document.getElementById("submitBtn").textContent = english ? "Save" : "حفظ الموقع";
+
+  await deleteSuggestion(id, true);
+
+  document.getElementById("siteForm").scrollIntoView({ behavior:"smooth" });
+  alert(english
+    ? "Form filled! Check the logo/description then press Save."
+    : "عمّرنا الفورم! شوف اللوغو والوصف ومن بعد اضغط حفظ.");
+}
+
+async function deleteSuggestion(id, silent){
+  const before = suggestions;
+  suggestions = suggestions.filter(s => s.id !== id);
+
+  if(cloudReady){
+    try{
+      await cloud.collection(SUGGESTIONS_COLLECTION).doc(String(id)).delete();
+    }catch(e){
+      if(!silent) alert(cloudErrorMsg(e));
+      suggestions = before;
+      return;
+    }
+  }
+
+  renderSuggestions();
+  updateStats();
+}
+
+
+/* =====================================================
    ADMIN - SITE MANAGEMENT (add / edit / delete)
    ===================================================== */
 
@@ -2005,8 +2231,10 @@ function showPage(page){
     renderCatsTable();
     renderSitesTable();
     renderReports();
+    renderSuggestions();
     updateStats();
     ensureReportsLoaded();
+    ensureSuggestionsLoaded();
   }
 
   window.scrollTo({ top:0, behavior:"smooth" });
@@ -2214,6 +2442,7 @@ function updateStats(){
   document.getElementById("totalSites").textContent = db.length;
   document.getElementById("totalReports").textContent = reports.length;
   document.getElementById("totalFavorites").textContent = favorites.length;
+  document.getElementById("totalSuggestions").textContent = suggestions.length;
 
   const clicks = db.reduce((sum,site) => sum + (site.clicks || 0), 0);
   document.getElementById("totalClicks").textContent = clicks;
@@ -2350,7 +2579,13 @@ const translations = {
     labelPassword:"كلمة السر",
     loginBtn:"دخول",
     loginCancelBtn:"إلغاء",
-    logoutBtnText:"خروج"
+    logoutBtnText:"خروج",
+    suggestBtnText:"اقترح موقع",
+    suggestTitle:"💡 اقترح موقع",
+    suggestDesc:"عندك موقع مفيد؟ شاركو معانا — غادي يتم التحقق منه ثم ينشر!",
+    sugLabelDesc:"الوصف (اختياري)",
+    suggestionsTitle:"💡 اقتراحات المواقع",
+    statSuggestions:"اقتراحات"
   },
   en:{
     title:"The ultimate directory of Moroccan & international sites 🇲🇦",
@@ -2401,7 +2636,13 @@ const translations = {
     labelPassword:"Password",
     loginBtn:"Sign in",
     loginCancelBtn:"Cancel",
-    logoutBtnText:"Logout"
+    logoutBtnText:"Logout",
+    suggestBtnText:"Suggest a site",
+    suggestTitle:"💡 Suggest a site",
+    suggestDesc:"Know a useful site? Share it with us — we'll review it before publishing!",
+    sugLabelDesc:"Description (optional)",
+    suggestionsTitle:"💡 Site Suggestions",
+    statSuggestions:"Suggestions"
   }
 };
 
@@ -2483,6 +2724,18 @@ function applyTranslations(){
   document.getElementById("loginBtn").textContent = t.loginBtn;
   document.getElementById("loginCancelBtn").textContent = t.loginCancelBtn;
   document.getElementById("logoutBtnText").textContent = t.logoutBtnText;
+
+  document.getElementById("suggestBtnText").textContent = t.suggestBtnText;
+  document.getElementById("suggestTitle").textContent = t.suggestTitle;
+  document.getElementById("suggestDesc").textContent = t.suggestDesc;
+  document.getElementById("sugLabelName").textContent = t.labelName;
+  document.getElementById("sugLabelUrl").textContent = t.labelUrl;
+  document.getElementById("sugLabelCategory").textContent = t.labelCategory;
+  document.getElementById("sugLabelDesc").textContent = t.sugLabelDesc;
+  document.getElementById("suggestSendBtn").textContent = t.reportSendBtn;
+  document.getElementById("suggestCancelBtn").textContent = t.reportCancelBtn;
+  document.getElementById("suggestionsTitle").textContent = t.suggestionsTitle;
+  document.getElementById("statSuggestions").textContent = t.statSuggestions;
 
   renderCategories();
   renderCategorySelect();
